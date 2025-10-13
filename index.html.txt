@@ -1,0 +1,392 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>救急医学 eラーニング模擬試験</title>
+    <!-- Tailwind CSS CDN 読み込み -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        /* カスタムスタイル: 高級感のあるダークテーマ */
+        :root {
+            --color-primary: #1F2937; /* Charcoal/Dark Blue */
+            --color-secondary: #FBBF24; /* Amber/Gold Accent */
+            --color-text: #E5E7EB; /* Light Gray Text */
+            --color-correct: #10B981; /* Emerald Green */
+            --color-incorrect: #EF4444; /* Red */
+        }
+        body {
+            font-family: "Inter", sans-serif;
+            background-color: var(--color-primary);
+            color: var(--color-text);
+            line-height: 1.6;
+        }
+        .container {
+            max-width: 900px;
+        }
+        .quiz-card {
+            background-color: #374151; /* Slightly lighter dark background */
+            box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.2), 0 4px 6px -2px rgba(0, 0, 0, 0.1);
+        }
+        .option-button {
+            transition: all 0.2s;
+            border: 1px solid #4B5563;
+        }
+        .option-button:hover:not([disabled]) {
+            background-color: #4B5563;
+            border-color: var(--color-secondary);
+        }
+        .main-button {
+            background-color: var(--color-secondary);
+            color: var(--color-primary);
+            font-weight: bold;
+            transition: background-color 0.2s;
+        }
+        .main-button:hover:not([disabled]) {
+            background-color: #D97706; /* Darker Gold */
+        }
+        .result-correct {
+            background-color: rgba(16, 185, 129, 0.1); /* Light green background */
+            border-left: 4px solid var(--color-correct);
+        }
+        .result-incorrect {
+            background-color: rgba(239, 68, 68, 0.1); /* Light red background */
+            border-left: 4px solid var(--color-incorrect);
+        }
+        /* モバイルフレンドリーな調整 */
+        @media (max-width: 640px) {
+            .container {
+                padding: 1rem;
+            }
+            .quiz-card {
+                padding: 1rem;
+            }
+        }
+    </style>
+</head>
+<body class="min-h-screen flex items-center justify-center p-4 sm:p-8">
+    <div id="quiz-container" class="container mx-auto">
+        <header class="text-center mb-8">
+            <h1 class="text-4xl font-extrabold text-white mb-2 tracking-wider">
+                救急医学 模擬試験
+            </h1>
+            <p class="text-xl text-yellow-400 font-medium">eラーニング用 全100問からランダム5問</p>
+            <div id="status-message" class="mt-4 text-white text-lg font-semibold"></div>
+        </header>
+
+        <main id="quiz-area" class="quiz-card rounded-2xl p-6 sm:p-10">
+            <!-- クイズコンテンツがここに挿入されます -->
+            <div id="questions-list">
+                <p class="text-center text-xl p-8">「再挑戦する」ボタンを押して、模擬試験を開始してください。</p>
+            </div>
+
+            <div id="controls" class="mt-8 flex justify-center space-x-4">
+                <button id="submit-button" onclick="gradeQuiz()" class="main-button rounded-xl px-8 py-3 text-lg opacity-50 cursor-not-allowed" disabled>
+                    採点する
+                </button>
+                <button id="retry-button" onclick="initQuiz()" class="main-button rounded-xl px-8 py-3 text-lg">
+                    再挑戦する
+                </button>
+            </div>
+
+            <div id="results-area" class="mt-10 hidden">
+                <h2 class="text-3xl font-bold text-yellow-400 border-b-2 border-yellow-400 pb-2 mb-6">採点結果と解説</h2>
+                <!-- 結果と解説がここに挿入されます -->
+            </div>
+        </main>
+    </div>
+
+    <script>
+        // ----------------------------------------------------
+        // 1. データ定義 (全100問)
+        // ----------------------------------------------------
+        // correct: 0, 1, 2, 3 の0-indexedで正解の選択肢を指定
+        const allQuestions = [
+            {id: 'Q1', text: '人体の体幹を構成する要素として正しい組み合わせはどれですか。', options: ['頭、頸、胸、骨盤', '頸、胸、腹、四肢', '頭、頸、胸、腹', '胸、腹、上肢、下肢'], correct: 2, explanation: '人体は体幹と体肢に分けられ、体幹は頭、頸、胸、腹からなり、体肢は四肢と上肢と下肢からなります。'},
+            {id: 'Q2', text: '体腔のうち、横隔膜の上方に位置し、胸郭（胸骨、肋骨、胸椎）に囲まれている空間の名称は何ですか。', options: ['腹腔', '後腹膜腔', '胸腔', '骨盤腔'], correct: 2, explanation: '人体には胸腔、腹腔、骨盤腔の3つの体腔があり、胸腔は胸骨、肋骨、胸椎からなる胸郭に囲まれ、横隔膜の上方に位置しています。'},
+            {id: 'Q3', text: '腹腔のうち、骨盤（恥骨、坐骨、腸骨）によって囲まれている、最下部の部分を何と呼びますか。', options: ['後腹膜腔', '腹腔', '季肋部', '骨盤腔'], correct: 3, explanation: '腹腔のうち、骨盤で囲まれている部分を骨盤腔といいます。'},
+            {id: 'Q4', text: '腹部の臓器の位置を体表から推定する際の四分画法において、右側の肋骨弓の下方に位置し、肝臓、胆嚢、腎臓の一部が含まれる可能性がある区分はどれですか。', options: ['右下腹部', '左上腹部', '左下腹部', '右上腹部'], correct: 3, explanation: '腹部は右上腹部、左上腹部、右下腹部、左下腹部に4分画され、右上腹部は肝臓や胃の一部などが胸郭と腹腔の境（横隔膜）に存在する助骨弓下に位置します。'},
+            {id: 'Q5', text: '体肢を身体の中心線（正中矢状面）に近づける動きを指す医学用語は何ですか。', options: ['伸展', '外転', '屈曲', '内転'], correct: 3, explanation: '体肢を正中矢状面（体の中心線）に近づける動きを「内転」といいます。'},
+            {id: 'Q6', text: '矢状面上で、関節の角度を減少させるような、肘を曲げる動きを指す用語はどれですか。', options: ['伸展', '内転', '屈曲', '外転'], correct: 2, explanation: '矢状面上で、上肢を曲げる（関節の角度を小さくする）動きを「屈曲」といいます。'},
+            {id: 'Q7', text: '身体の体液のうち、細胞膜で包まれ、その中にさらに核膜で包まれた遺伝情報の本体である遺伝物質を収めている構造の名称はどれですか。', options: ['ミトコンドリア', 'リポソーム', '細胞質', '核（核小体）'], correct: 3, explanation: '細胞は細胞膜で包まれ、その中にさらに核膜で包まれた核があり、核には遺伝情報の本体である遺伝物質が収められています。'},
+            {id: 'Q8', text: '組織の種類のうち、神経衝動（電気的信号）を一定方向に伝え、身体の各器官間の連携を可能にする組織はどれですか。', options: ['上皮組織', '結合組織', '筋組織', '神経組織'], correct: 3, explanation: '神経組織は、電気的信号を一定方向に伝える組織です。'},
+            {id: 'Q9', text: '呼吸器系の機能として、気道（空気の通り道）の役割を担っていない部位はどれですか。', options: ['鼻腔', '喉頭', '気管', '食道'], correct: 3, explanation: '気道は、鼻腔、咽頭、喉頭を経て気管に続きます。食道は消化管の一部であり、食物の通り道です。'},
+            {id: 'Q10', text: '呼吸運動における吸気時（息を吸う時）の横隔膜の動きとして正しいものはどれですか。', options: ['弛緩して上方に押し上がる', '収縮して下方に下がる', '弛緩して下方に下がる', '収縮して上方に押し上がる'], correct: 1, explanation: '吸気時は、横隔膜の収縮により、横隔膜が下方に下がることによって胸腔内が陰圧になり、肺が膨らみます。'},
+            {id: 'Q11', text: '肺において、空気と血液の間でガス交換（酸素と二酸化炭素の交換）が行われる最小単位の場所はどこですか。', options: ['細気管支', '肺葉', '肺静脈', '肺胞'], correct: 3, explanation: '肺胞は、呼吸におけるガス交換が行われる場所です。'},
+            {id: 'Q12', text: '循環器系において、心臓が拍動する場所として、体表から確認できる位置はどこですか。', options: ['右側胸腔、第5肋間', '正中線、第3肋間', '左側鎖骨上、第2肋間', '左側鎖骨線上、第5肋間'], correct: 3, explanation: '心臓は左側鎖骨線上、第5肋間に拍動が触知されます。'},
+            {id: 'Q13', text: '心臓の4つの部屋のうち、全身から返ってきた静脈血（酸素の少ない暗赤色）を受け入れるのはどこですか。', options: ['左心房', '左心室', '右心房', '右心室'], correct: 2, explanation: '全身から返ってきた静脈血は、大静脈を通って右心房に流入します。'},
+            {id: 'Q14', text: '心臓の右心室から肺へ血液を送り出す血管の名称はどれですか。', options: ['大動脈', '肺静脈', '肺動脈', '冠動脈'], correct: 2, explanation: '右心室は肺動脈へ血液を送り出し、肺でガス交換を行います。'},
+            {id: 'Q15', text: '血液の構成成分のうち、核を持たない小型の細胞断片であり、血液の凝固に最も重要な役割を果たすものはどれですか。', options: ['赤血球', '白血球', '血漿', '血小板'], correct: 3, explanation: '血小板は核を持たない小型の細胞断片であり、血液の凝固に関係しています。'},
+            {id: 'Q16', text: '血液の構成成分のうち、酸素運搬を担うヘモグロビン（血色素）を含んでいる細胞はどれですか。', options: ['血小板', '白血球', '赤血球', 'リンパ球'], correct: 2, explanation: '赤血球は、内部にヘモグロビンを含み、酸素運搬の主役を担っています。'},
+            {id: 'Q17', text: '血管の種類のうち、壁が厚く、血圧の作用を受けているが、弁を持たないのはどれですか。', options: ['細静脈', '毛細血管', '動脈', '静脈'], correct: 2, explanation: '動脈は壁が厚く、弁がありません。静脈は壁が薄く、弁があります。'},
+            {id: 'Q18', text: '血液の総量のうち、血漿（液体成分）が占める割合として、適切な値はどれですか。', options: ['約25%', '約45%', '約55%', '約65%'], correct: 2, explanation: '血液は細胞成分（約45%）と液体成分（血漿：約55%）からなります。'},
+            {id: 'Q19', text: '成人の体液量が体重に占める割合として、適切な値はどれですか。', options: ['約80%', '約70%', '約60%', '約55%'], correct: 2, explanation: '生命体に含まれている水は体液と呼ばれ、成人では体重の約60%を占めます。'},
+            {id: 'Q20', text: '細胞外液（細胞の外側にある体液）の電解質として、主体となっている陽イオンと陰イオンの組み合わせはどれですか。', options: ['カリウムイオンとリン酸イオン', 'カリウムイオンと塩化物イオン', 'ナトリウムイオンと塩化物イオン', 'ナトリウムイオンとリン酸イオン'], correct: 2, explanation: '体液中の電解質は、細胞外液ではナトリウムイオン（陽イオン）と塩化物イオン（陰イオン）を主体としています。'},
+            {id: 'Q21', text: '消化器系において、食物の消化と吸収に必要な消化液を分泌する臓器はどれですか。', options: ['肝臓、胆嚢、脾臓', '腎臓、脾臓、胃', '唾液腺、胃、膵臓', '脾臓、胆嚢、大腸'], correct: 2, explanation: '食物の消化に必要な消化液は、唾液腺、胃、膵臓、腸などから分泌されます。'},
+            {id: 'Q22', text: '消化管のうち、食物を一時的に貯留し、ペプシン（タンパク質分解酵素）を分泌するのはどこですか。', options: ['食道', '十二指腸', '胃', '大腸'], correct: 2, explanation: '胃液は、タンパク質分解酵素のペプシンと胃酸（塩酸）が分泌されます。'},
+            {id: 'Q23', text: '消化管のうち、長さが約6～7mと最も長く、消化された栄養素や水分の大部分が吸収される場所はどこですか。', options: ['胃', '食道', '小腸', '大腸'], correct: 2, explanation: '小腸は長さ約6～7mで、主に消化された栄養素と水分の吸収を行います。'},
+            {id: 'Q24', text: '膵臓が分泌する膵液に含まれる消化酵素のうち、タンパク質の分解に関与するものはどれですか。', options: ['アミラーゼ', 'リパーゼ', 'トリプシン', '塩酸'], correct: 2, explanation: '膵液には、デンプンを分解するアミラーゼ、脂肪を分解するリパーゼ、そしてタンパク質を分解するトリプシンなどが含まれます。'},
+            {id: 'Q25', text: '肝臓が担う機能のうち、体内の有害な老廃物を無毒化し、体外へ排泄されるようにする働きを何と呼びますか。', options: ['胆汁の生成', '血糖値の調節', 'アルブミンの合成', '解毒'], correct: 3, explanation: '肝臓は、アルコールや薬物など有害な老廃物を無毒化して、胆汁や尿中へ排泄すること（解毒）を担います。'},
+            {id: 'Q26', text: '膵臓から分泌されるホルモンのうち、血糖値を低下させる作用を持つものはどれですか。', options: ['アドレナリン', 'グルカゴン', 'インスリン', 'チロキシン'], correct: 2, explanation: '膵臓は、血糖値を下げるインスリンと、血糖値を上げるグルカゴンなど4種類のホルモンを分泌します。'},
+            {id: 'Q27', text: '腎臓が担う主要な機能として最も適切なものはどれですか。', options: ['血糖値の調節と免疫機能', 'タンパク質の消化と吸収', '体液のバランス維持と老廃物の体外排出', '赤血球の生成と酸素運搬'], correct: 2, explanation: '腎臓は、血液中の有害な老廃物を尿として体外へ排泄することと、体液のバランスを調節する役割を持っています。'},
+            {id: 'Q28', text: '腎臓で生成された尿を、膀胱へと輸送する細長い管の名称はどれですか。', options: ['尿道', '腎動脈', '尿嚢', '尿管'], correct: 3, explanation: '腎臓から排泄された尿は、尿管を通って膀胱に送られます。'},
+            {id: 'Q29', text: '神経系のうち、血圧、体温、消化、循環などの身体の内部環境を意志とは関係なく調整しているのはどれですか。', options: ['体性神経系', '知覚神経', '運動神経', '自律神経系'], correct: 3, explanation: '自律神経系は、身体の内部環境を一定に保つ（ホメオスタシス）役割を担っており、意志では制御することができません。'},
+            {id: 'Q30', text: '脳から脊髄へ続く、中枢神経系を構成する主要な構造物は何ですか。', options: ['大脳', '小脳', '延髄', '脳幹'], correct: 2, explanation: '延髄は脳幹の一部であり、脊髄と大脳を結ぶ重要な構造です。'},
+            {id: 'Q31', text: '運動器系を構成する骨格のうち、頭蓋（頭蓋骨）を構成する骨はどれですか。', options: ['鎖骨', '肋骨', '後頭骨', '上腕骨'], correct: 2, explanation: '頭蓋骨は、前頭骨、側頭骨、後頭骨などで構成されます。'},
+            {id: 'Q32', text: '脊柱（背骨）を構成する椎骨の数は、仙骨と尾骨の癒合した部分を除くと、通常何個からなりますか。', options: ['7個（頸椎）', '12個（胸椎）', '5個（腰椎）', '24個（頸椎7、胸椎12、腰椎5）'], correct: 3, explanation: '脊柱は、頸椎7個、胸椎12個、腰椎5個、仙骨と尾骨の癒合したもので構成されています。'},
+            {id: 'Q33', text: '骨格を形成する骨のうち、胸郭を構成する骨として、含まれないものはどれですか。', options: ['胸骨', '肋骨', '胸椎', '鎖骨'], correct: 3, explanation: '胸郭は、胸骨、肋骨、胸椎で構成されています。'},
+            {id: 'Q34', text: '2つの骨の結合部において、中間に関節液を含んだ構造を持つものは何と呼ばれますか。', options: ['軟骨', '靭帯', '腱', '関節'], correct: 3, explanation: '関節は、2つの骨の結合組織が結び、中に関節液を入れたものをいいます。'},
+            {id: 'Q35', text: '随意的に収縮させることができない筋肉（不随意筋）はどれですか。', options: ['骨格筋', '心筋', '腱', '靭帯'], correct: 1, explanation: '筋肉には、自分の意思で収縮できる骨格筋（随意筋）と、意志と関係なく収縮する心筋・平滑筋（不随意筋）があります。'},
+            {id: 'Q36', text: '皮膚が担う機能のうち、特に深達性熱傷によってその機能が失われることで、感染や体温喪失の原因となる機能はどれですか。', options: ['圧覚', '触覚', '保護（バリア）機能', '知覚機能'], correct: 2, explanation: '皮膚は、外界からの物理的・化学的・生物的な刺激や病原体の侵入を防ぐ保護（バリア）機能を担っており、これが失われると感染、体温喪失などのリスクが高まります。'},
+            {id: 'Q37', text: '五感（感覚器系）のうち、眼球の透明な前壁であり、光を屈折させて網膜に像を結ばせる役割を担う部位はどれですか。', options: ['網膜', '虹彩', '涙腺', '角膜'], correct: 3, explanation: '角膜は、眼球と付属器である涙腺、涙嚢などとともに、眼球の付属器を構成し、光を屈折させて網膜に像を結ばせます。'},
+            {id: 'Q38', text: '五感（感覚器系）のうち、平衡感覚（重力、直線加速度、回転運動）を司る部位は耳のどの部分に含まれますか。', options: ['外耳', '中耳', '内耳', '耳介'], correct: 2, explanation: '内耳にある前庭、三半規管、蝸牛は、音や振動の刺激を伝えるだけでなく、平衡感覚を司ります。'},
+            {id: 'Q39', text: 'WHO（世界保健機関）が提唱する「健康」の定義において、含まれる3つの側面はどれですか。', options: ['経済的、精神的、身体的', '身体的、経済的、社会的', '身体的、精神的、社会的', '身体的、精神的、文化的'], correct: 2, explanation: 'WHOの定義する健康とは、身体的、精神的、社会的にすべてが満たされた状態を指します。'},
+            {id: 'Q40', text: '疾病の原因を外因性、内因性、およびその重複に分類した場合、内因性の原因に該当するのはどれですか。', options: ['細菌、ウイルス', '毒物、放射線', '遺伝、代謝異常', '気温、湿度'], correct: 2, explanation: '疾病の原因は、内因性（遺伝、代謝異常など）、外因性（細菌、ウイルス、温度など）、およびその重複に分類されます。'},
+            {id: 'Q41', text: '災害の定義として、「地域・広域の人命・物的資源が破壊され、既存の医療資源では対応できない」事態を何と呼びますか。', options: ['人為災害', '自然災害', '災害', '特殊災害'], correct: 2, explanation: '災害とは、地域・広域の人命・物的資源が破壊され、既存の救護や支援ができない事態を指します。'},
+            {id: 'Q42', text: '災害の分類のうち、「特殊災害」に分類されるのはどれですか。', options: ['地震、台風、津波', '大規模交通事故、都市火災', 'CBRNE災害', '老衰、疾病'], correct: 2, explanation: '災害は、自然災害、人為災害、そして特殊災害（CBRNE災害など）に分類されます。'},
+            {id: 'Q43', text: 'CBRNE災害の頭文字「R」が示す意味はどれですか。', options: ['Chemical (化学)', 'Biological (生物)', 'Radiological (放射性物質)', 'Explosive (爆発物)'], correct: 2, explanation: 'CBRNEは、C（化学）、B（生物）、R（放射性物質）、N（核）、E（爆発物）を意味します。'},
+            {id: 'Q44', text: '多数傷病者事故発生時において、医療資源の不足から、通常の医療と異なる対応が求められる医療を何と呼びますか。', options: ['救急医療', '救急活動', '予防活動', '災害医療'], correct: 3, explanation: '多数傷病者が発生した際、医療需要に医療資源が不均衡になることが災害医療の発生条件です。'},
+            {id: 'Q45', text: '多数傷病者対応の原則である「CSCATTT」のうち、指揮命令系統と連絡調整を指す要素はどれですか。', options: ['S (Safety)', 'T (Triage)', 'C (Command and Control)', 'A (Assessment)'], correct: 2, explanation: 'CSCATTTの頭文字Cは、Command and Control（指揮命令と連絡調整）を意味します。'},
+            {id: 'Q46', text: '「CSCATTT」の原則において、情報伝達、通信手段の確保、安全確保の確認など、情報収集と伝達に関わる要素はどれですか。', options: ['A (Assessment)', 'T (Treatment)', 'C (Communication)', 'S (Safety)'], correct: 2, explanation: 'Communication（通信、連携）は、情報伝達手段の確保、状況把握、安全確保の情報収集など、情報の共有や調整を指します。'},
+            {id: 'Q47', text: '多数傷病者発生時に行われるトリアージ（Triage）の目的として、最も優先されるべき事項はどれですか。', options: ['すべての傷病者に高度な治療を提供すること', '家族の要望に応じた搬送先を決定すること', '限られた医療資源で、最大多数の命を救うこと', '傷病者の死因を特定すること'], correct: 2, explanation: 'トリアージは、医療資源が不足する状況下で、1人でも多くの命を救うために、傷病者の優先順位を決定することです。'},
+            {id: 'Q48', text: 'トリアージ区分において、すべてが生理学的生命危機に瀕している、または増悪傾向にある傷病に分類される色はどれですか。', options: ['黄（II）', '緑（III）', '白（IV）', '赤（I）'], correct: 3, explanation: '赤（最緊急、I）は、すべてが生理学的生命危機に瀕している、または増悪傾向にある傷病と定義されます。'},
+            {id: 'Q49', text: 'トリアージ区分において、症状が軽度で、経過観察後に治療が必要であり、自己歩行が可能な傷病者が分類される色はどれですか。', options: ['赤（I）', '黄（II）', '緑（III）', '黒（IV）'], correct: 2, explanation: '緑（軽症、III）は、症状が軽度で、経過観察後に治療が必要な傷病が分類されます。'},
+            {id: 'Q50', text: 'トリアージ区分において、救命不能、または蘇生不適応であり、医学的処置を必要としないと判断される色はどれですか。', options: ['赤（I）', '黄（II）', '緑（III）', '黒（IV）'], correct: 3, explanation: '黒（不処置、IV）は、救命不能、蘇生不適応、または医学的処置を必要としない傷病者と分類されます。'},
+            {id: 'Q51', text: '多数傷病者対応時、医師が現場に不在の場合に、トリアージを実施する役割を担うべき者として優先されるのは誰ですか。', options: ['消防本部長', '最先着救急隊員', '救急救命士または救急隊長', '警察官'], correct: 2, explanation: 'トリアージ担当者は、医師が現場にいない場合、救急救命士として応急処置の対応で困難な傷病者の救命長を担える者が担当します。'},
+            {id: 'Q52', text: '第一次トリアージ（START法）の手順において、「歩行可能か？」の問いに対して「はい」と答えた傷病者のトリアージ区分は、一旦どの色に分類されますか。', options: ['赤', '黄', '緑', '黒'], correct: 2, explanation: 'START法では、「歩行可能」な傷病者は、一旦緑（軽症）と判定されます。'},
+            {id: 'Q53', text: '第一次トリアージ（START法）の手順において、自発呼吸があるが、その呼吸数が毎分9回以下であった場合、トリアージ区分はどれになりますか。', options: ['緑', '黄', '赤', '黒'], correct: 2, explanation: 'START法では、呼吸数が9回/分以下、または30回/分以上の場合、赤（最優先）と判定されます。'},
+            {id: 'Q54', text: '第一次トリアージ（START法）の手順において、橈骨動脈に触知が確認できなかった（循環異常）傷病者のトリアージ区分はどれになりますか。', options: ['緑', '黄', '赤', '黒'], correct: 2, explanation: '橈骨動脈が触知不能（または毛細血管再充満時間が2秒超）の場合、循環異常とみなし、赤（最優先）と判定されます。'},
+            {id: 'Q55', text: '多数傷病者対応における「治療 (Treatment)」の原則として実施されるべき事項はどれですか。', options: ['すべての傷病者に対し、根治的な手術を行う', '必要最低限の限定化処置を行い、安定化を図る', 'トリアージ後の再評価を優先する', '全身固定を行わずに搬送を急ぐ'], correct: 1, explanation: '現場での治療は、傷病者の安定化のための必要最低限の限定化処置（応急処置）を実施し、安全に医療機関に搬送することを目的とします。'},
+            {id: 'Q56', text: '多数傷病者事故発生時において、傷病者を搬送先の医療機関に引き渡す直前に実施されるトリアージは、一般的に何トリアージと呼ばれますか。', options: ['第一次トリアージ', '応急処置トリアージ', '第二次トリアージ', '最終トリアージ'], correct: 2, explanation: '第二次トリアージは、現場（応急救護所）から医療機関や救護所などへ移送する際に、搬送優先順位を決定するために行われます。'},
+            {id: 'Q57', text: '災害医療現場において、医師が現場に到着し、トリアージの判断や処置方針を再検討する場合に実施されるトリアージを何と呼びますか。', options: ['第一次トリアージ', '第二次トリアージ', '再トリアージ', '最終トリアージ'], correct: 2, explanation: '医師による再トリアージは、医師が現場に到着し、時間の経過や応急処置の実施により傷病者の状態が変化した場合などに実施されます。'},
+            {id: 'Q58', text: '災害時、最先着救急隊の活動において、まず実施すべき重要な事項はどれですか。', options: ['傷病者全員に直ちに治療を行う', '後着隊のために救護所をすぐに設置する', '災害モード（多数傷病者対応）への切り替えの可否を判断する', '警察・消防に指揮権を委譲する'], correct: 2, explanation: '最先着救急隊の隊長は、災害発生の危険性を認識し、災害モードへの切り替えを行うことが最も重要です。'},
+            {id: 'Q59', text: '災害現場の指揮本部の役割として、最も重要なものはどれですか。', options: ['現場指揮本部長が現場に駆けつけ、個別の処置を行うこと', '情報収集、戦略の決定、各機関との連絡調整を担うこと', '負傷した隊員のみの治療を行うこと', '現場にいる全員の安否確認を行うこと'], correct: 1, explanation: '指揮本部は、多数傷病者の円滑かつ的確な活動のため、情報収集・管理、指揮命令系統の確立、医療機関との連携などを担います。'},
+            {id: 'Q60', text: '災害現場における応急救護所（救護所）の設置目的として正しいものはどれですか。', options: ['傷病者が休息を取るためのスペースを提供すること', '救急隊員が休憩するための拠点とすること', 'トリアージ後の傷病者のカテゴリ別収容、応急処置を実施すること', '現場活動の記録作成のみを行うこと'], correct: 2, explanation: '救護所（応急救護所）は、二次トリアージの結果に基づき、カテゴリ別（赤、黄、緑）にテントなどに収容し、治療（応急処置）を実施する場所です。'},
+            {id: 'Q61', text: '救護所（応急救護所）の配置レイアウトにおいて、トリアージエリアの入口に最も近い場所に設置されるのはどの色のテントですか。', options: ['黄', '赤', '緑', '黒'], correct: 2, explanation: 'トリアージエリアの入口には、軽症者（緑）テントを配置し、次に重症度に応じて赤、黄の順で配置されます。'},
+            {id: 'Q62', text: '多数傷病者対応の際の安全管理において、救急隊員が活動を行うために、まず確認すべきことは何ですか。', options: ['傷病者の年齢・性別', '応援要請の状況', '危険源の有無と、安全な活動場所の確保', '搬送先の医療機関の決定'], correct: 2, explanation: '現場活動における安全管理では、救急隊員および協力者などに危険が予測される場合は、迅速に安全な場所へ移動します。安全確保は活動の基本です。'},
+            {id: 'Q63', text: '多数傷病者への対応における搬送（トランスポート）の決定において、最優先されるべき判断基準はどれですか。', options: ['傷病者の家族の希望', '傷病者の年齢', '搬送可能な救急車の台数', 'トリアージによる搬送優先順位'], correct: 3, explanation: '搬送の決定は、トリアージの結果や傷病者の重症度に基づき、最も重症度の高い傷病者を優先することが原則です。'},
+            {id: 'Q64', text: '緊急消防援助隊の編成において、大隊指揮隊を中核とし、消火・救助・救急・後方支援・通信支援・航空・水上・特殊装備の各中隊で構成されるのは、どの部隊ですか。', options: ['指揮支援部隊', '支援統括部隊', '都道府県大隊', '特殊装備中隊'], correct: 2, explanation: '緊急消防援助隊は、指揮支援部隊と都道府県大隊からなり、都道府県大隊は指揮本部隊と各中隊（消火、救助、救急など）で構成されます。'},
+            {id: 'Q65', text: '災害派遣医療チーム（DMAT）が、災害拠点病院に設置し、広域医療搬送の拠点として運営に関わる場所はどこですか。', options: ['救護所', '現場指揮本部', 'SCU（Staging Care Unit）', '治療テント'], correct: 2, explanation: 'DMATは、被災地域内の広域医療搬送の拠点となるSCUの設置や運営に携わります。'},
+            {id: 'Q66', text: 'DMATが被災地での活動を終了し、撤収する時期として適切なものはどれですか。', options: ['発災から1週間以内', '発災から概ね72時間以内（2週間を超えない期間）', '傷病者全員の死亡が確認された時点', '避難所がすべて閉鎖された時点'], correct: 1, explanation: 'DMATは、原則として発災直後の概ね48時間以内に活動を開始し、活動期間は概ね72時間（追加派遣を含め2週間を超えない期間）までとされています。'},
+            {id: 'Q67', text: '多数傷病者対応時、警察が担う役割として、含まれないものはどれですか。', options: ['現場の安全管理、交通規制', '犯罪捜査、証拠の保全', '傷病者の身元確認', '現場での特定行為（除細動・輸液）の実施'], correct: 3, explanation: '警察は、犯罪捜査、交通規制、現場の安全確保などを担いますが、特定行為などの医療処置は行いません。'},
+            {id: 'Q68', text: '災害時における日本赤十字社の活動として正しいものはどれですか。', options: ['現場でのトリアージと初期治療', '自衛隊の活動の指揮統制', '医療救護班の派遣、救護所の運営、義援物資の配付', '救急隊員に対する特定行為の指示'], correct: 2, explanation: '日本赤十字社は、救護班の派遣、救護所の設置運営、献血、義援物資の配付などを担います。'},
+            {id: 'Q69', text: '災害現場で活動を終了し、撤収した後に消防本部へ提出する報告書に記載すべき事項として、最も重要なものはどれですか。', options: ['現場で発見した遺留品のリスト', '救急事故の概要と、活動上問題となった事項', '救急隊員の反省のみ', '搬送先の医療機関の所在地'], correct: 1, explanation: '活動後の報告、記録には、救急事故の概要、傷病者の状態、実施した処置の内容、救急活動上で問題または障害となった事項を記載する必要があります。'},
+            {id: 'Q70', text: '災害現場において、消防機関が担う役割として正しいものはどれですか。', options: ['警察官の指揮下に入り活動すること', '消防活動や救急活動による傷病者の救出、応急処置、搬送', '災害発生直後のインフラ復旧作業のみを行うこと', '犯罪捜査の指揮を行うこと'], correct: 1, explanation: '消防機関は、消防活動や救急活動を通じ、人命救助、傷病者の救出、応急処置、搬送を行います。'},
+            {id: 'Q71', text: '救急隊員の行える処置の範囲を、心肺停止傷病者に対して静脈路確保、輸液、気管内挿管などができるように拡大した制度の名称は何ですか。', options: ['救急隊員の役割拡大', '救急業務の法制化', '救急救命士制度', 'メディカルコントロール制度'], correct: 2, explanation: '心肺機能停止傷病者に対して、医師の指示の下、特定行為（静脈路確保、輸液、気管内挿管など）を行うことができる救急救命士制度が平成3年に創設されました。'},
+            {id: 'Q72', text: '救急救命士が行う特定行為（医師の指示の下で行う処置）として、含まれていないものはどれですか。', options: ['自動体外式除細動器（AED）による除細動', '乳酸リンゲル液を用いた静脈路確保', '気管内チューブを用いた気道確保', '止血'], correct: 3, explanation: '止血は、救急救命士ではない救急隊員も行うことができる応急処置です。AED、静脈路確保、気管内チューブによる気道確保は特定行為（またはそれに準じる行為）に含まれます。'},
+            {id: 'Q73', text: '救急救命士が、心肺機能停止前の重度傷病者に対して、医師の指示の下で実施できるようになった特定行為はどれですか。', options: ['心臓マッサージの実施', '血糖測定とブドウ糖溶液の投与', '止血の実施', '自動体外式除細動器（AED）の実施'], correct: 1, explanation: '平成26年4月より、心肺機能停止前の重度傷病者に対する血糖測定とブドウ糖溶液の投与などが特定行為に追加されました。'},
+            {id: 'Q74', text: '救急業務の運営体制のうち、市町村が単独で救急業務を実施する方式を何と呼びますか。', options: ['組合', '事務委託', '市町村（単独実施）', '広域連携'], correct: 2, explanation: '救急業務の運営体制は、市町村（単独実施）、組合、事務委託の3種類があります。'},
+            {id: 'Q75', text: '救急隊員（准救急隊員ではない）の要件として、消防学校の教育訓練を修了した後、救急業務に関する250時間以上の教育訓練を修了した者が該当するのは誰ですか。', options: ['救急救命士', '救急救命師', '救急隊員', '准救急隊員'], correct: 2, explanation: '救急隊員は、消防学校の教育訓練を修了した後、250時間以上の救急業務に関する教育訓練を修了した者です。'},
+            {id: 'Q76', text: '救急業務を行う救急自動車には、救急隊員および准救急隊員のいずれかを含む隊員が、最低何名以上乗車しなければならないと定められていますか。', options: ['1人', '2人', '3人', '4人'], correct: 1, explanation: '救急隊は、救急隊員または准救急隊員を2人以上乗車させることが義務付けられています。'},
+            {id: 'Q77', text: '救急自動車の要件として、傷病者室は、頭部側、右側、左側のすべてに300mm以上の空間を確保できる必要がありますが、これは主に何の目的のためですか。', options: ['換気設備の確保', '搬送物品の収納', '適切な処置スペースの確保', '燃費効率の向上'], correct: 2, explanation: '救急自動車の傷病者室は、頭部側、右側、左側に300mm以上の空間を確保し、必要な処置を適切に行える構造でなければなりません。'},
+            {id: 'Q78', text: '救急隊員の教育訓練のうち、救急隊員全員（新任隊員、現任隊員、救急救命士）に対して受講が必須とされている訓練項目はどれですか。', options: ['挿管', 'エピネフリン投与', '傷病者観察（初期評価）', '薬物投与'], correct: 2, explanation: '表1-2-7によると、「傷病者観察（初期評価）」は、新任隊員、准救急隊員、現任隊員、救急救命士のすべてに必須の教育項目とされています。'},
+            {id: 'Q79', text: '救急隊員が病院前で実施した処置の医学的な妥当性や、質を確保するために、都道府県単位で設置・運営される体制は何と呼ばれますか。', options: ['救急医療システム', '病院前救護体制', 'メディカルコントロール体制', '応急手当普及体制'], correct: 2, explanation: 'メディカルコントロール体制は、医学的な質を確保し、救急隊員の処置の医学的妥当性や適応を検証・評価する組織的仕組みです。'},
+            {id: 'Q80', text: 'メディカルコントロール（MC）体制の構成要素のうち、救急隊員が実施した処置が医学的に正しかったか否かを医師が評価・検証する要素はどれですか。', options: ['Plan (計画)', 'Do (実施)', 'Check (検証)', 'Act (改善)'], correct: 2, explanation: 'MC体制はPDCAサイクル（計画、実施、検証、改善）で運営され、Checkは事態検証、病院側からの評価、地域MCの評価など、処置の質の検証に当たります。'},
+            {id: 'Q81', text: '救急隊員が、傷病者の収容先病院の選定について、地域の医療体制情報や傷病者の状況を考慮し、客観的・科学的に搬送先を決定することを何と呼びますか。', options: ['家族希望優先', '救急医療相談', '傷病者の搬送及び受入れの実施基準', 'ドクターヘリの運用'], correct: 2, explanation: '搬送先の選定は、傷病者の搬送及び受入れの実施基準に基づき、客観的・科学的に搬送先を決定することが求められます。'},
+            {id: 'Q82', text: '市民からの緊急性の判断に迷う場合の電話相談に対し、緊急度判定や医療機関案内を行う事業の全国共通ダイヤルはどれですか。', options: ['119', '110', '#7119', '#9910'], correct: 2, explanation: '救急安心センター事業（#7119）は、市民からの救急相談に対し、地域の高い症状の傷病者を適切な医療機関につなげるために、緊急度判定や医療情報を提供します。'},
+            {id: 'Q83', text: '救急医療体制において、入院を必要としない初期（軽症）の傷病者を主に診療する医療機関の階層はどれですか。', options: ['三次救急医療機関', '二次救急医療機関', '初動救急医療機関', '救命救急センター'], correct: 2, explanation: '初動救急医療機関は、入院を必要としない初期の軽症患者を対象としています。'},
+            {id: 'Q84', text: '二次救急医療機関の診療体制のうち、夜間や休日に複数の病院が輪番制で協力して救急患者を受け入れる体制はどれですか。', options: ['救命救急センター制', 'ER型救急医療体制', '病院救急診療所方式', '病院群輪番制'], correct: 3, explanation: '病院群輪番制は、地域内の病院が協力して夜間・休日に輪番制で対応する二次救急の体制です。'},
+            {id: 'Q85', text: '救急医療機関の階層において、重篤な傷病者に対し、高度な救命医療と集中治療を提供し、常に専門医が常駐している体制はどれですか。', options: ['病院救急診療所', '二次救急医療機関', '三次救急医療機関（救命救命センター）', '初期救急医療機関'], correct: 2, explanation: '三次救急医療機関（救命救急センター）は、重篤な傷病者に対して、高度な救命医療を提供できる病院です。'},
+            {id: 'Q86', text: '救急隊員が、傷病者の搬送先を決定する際に、家族や関係者の希望があった場合の対応として、最も適切なものはどれですか。', options: ['家族の希望を最優先し、必ずその病院へ搬送する', '家族の希望は医学的な判断に関係ないので、一切考慮しない', '医学的な知見に基づき、収容能力を考慮し、適否を判断する', '希望があった場合は、救急隊長が搬送先を決定する'], correct: 2, explanation: '救急隊は、家族などの希望があった場合でも、医学的な知見および収容能力を考慮し、不測の事態が発生しないよう可否を判断する必要があります。'},
+            {id: 'Q87', text: '救急活動記録の目的として、含まれていないものはどれですか。', options: ['傷病者の発生状況や処置内容の記録', '医療機関への情報提供、医師の判断に役立てること', '警察や検察への情報提供義務', '救急隊員が行った処置の検証資料とすること'], correct: 2, explanation: '救急活動記録は、処置検証、記録、情報提供、業務の証明を目的としますが、警察等への資料提出は法令上の根拠に基づき行われるもので、記録の直接の目的ではありません。'},
+            {id: 'Q88', text: '救急活動記録は、診療録と同様に最低何年間保存することが、医療関係法規に基づき義務付けられていますか。', options: ['1年間', '3年間', '5年間', '10年間'], correct: 2, explanation: '救急活動記録は、医師法などの医療関係法規に基づき、診療録と同様に5年間の保存が義務付けられています。'},
+            {id: 'Q89', text: '救急活動中に、傷病者または同乗者からプライバシーに関する情報を得た場合、救急隊員が守るべき義務はどれですか。', options: ['警察に速やかに報告する', '救急活動記録に詳細に記載する', '知り得た秘密は漏らさない', '医療機関にすべて開示する'], correct: 2, explanation: '救急隊員は、業務上知り得たことについて他に漏らしてはならないという守秘義務があります。'},
+            {id: 'Q90', text: '救急隊の業務において、消防機関が救急自動車以外に、転院搬送の手段として利用することを推奨されているのはどれですか。', options: ['警察車両', '介護保険車両', '消防機関のヘリコプター', '霊柩車'], correct: 2, explanation: '転院搬送は救急自動車以外に、消防機関のヘリコプターや、都道府県などが運営する広域医療搬送システムの一環として利用されます。'},
+            {id: 'Q91', text: '救急隊員が、現場に居合わせた家族などに対し、電話で応急手当の方法を指導する業務を何と呼びますか。', options: ['応急手当普及活動', '現場指揮', '口頭指導', '医療通信'], correct: 2, explanation: '口頭指導は、救急現場に居合わせた者に対し、AEDを含む心肺蘇生法などの応急手当を電話で指導することです。'},
+            {id: 'Q92', text: '救急活動中に、傷病者が自殺未遂など、精神的・身体的に不安定な状態にあると認めた場合、救急隊員が連携すべき機関はどこですか。', options: ['警察署（生活安全課）', '精神障害者福祉に関する保護施設、保健所', '介護保険施設', '消防本部'], correct: 1, explanation: '精神障害者やアルコール中毒者などの取り扱いについては、精神障害者福祉に関する法律に基づき、保健所や保護施設との連携が必要です。'},
+            {id: 'Q93', text: '救急隊員が、救急活動中に得た情報から、傷病者が犯罪に巻き込まれている、または犯罪に関与している可能性がある場合、連携すべき機関はどこですか。', options: ['医療機関', '地域保健所', '警察署', '消防本部'], correct: 2, explanation: '救急活動の際、急病のほか、各種の事故、外傷、中毒などがあり、疾病か否か不明のものがある場合や、犯罪がからんでいる可能性がある場合は、警察との連携が必要です。'},
+            {id: 'Q94', text: '救急業務運営体制の「協同体制」を構成する要素のうち、搬送先の医療機関に該当するのはどれですか。', options: ['救急隊', '市民', '消防機関', '医師'], correct: 3, explanation: '救急医療体制は、市民、消防機関、医師が連携し、一体となって機能する体制です。'},
+            {id: 'Q95', text: '高齢者の医療の確保に関する法律に基づき、75歳以上の高齢者が加入する医療保険制度はどれですか。', options: ['国民健康保険', '健康保険', '介護保険制度', '後期高齢者医療制度'], correct: 3, explanation: '後期高齢者医療制度は、75歳以上の高齢者を対象とした医療保険制度です。'},
+            {id: 'Q96', text: '介護保険制度において、要介護・要支援認定を受けるための、原則的な対象年齢はどれですか。', options: ['20歳以上', '40歳未満', '40歳以上', '75歳以上'], correct: 2, explanation: '介護保険制度は、原則としてすべての40歳以上の者を被保険者としています。'},
+            {id: 'Q97', text: '救急業務に資する知識や技術の普及啓発活動の目的として、最も重要なものはどれですか。', options: ['消防機関の業務負担を減らすこと', '救急隊員に処置を教えること', '住民の応急手当能力の習得を促進し、救命効果を向上させること', '救急隊員の教育訓練の一環とすること'], correct: 2, explanation: '応急手当普及啓発活動は、住民による応急手当能力の習得を促進し、傷病者が救命される可能性を高めることを目的としています。'},
+            {id: 'Q98', text: '医療法において、「病院」とは、医師または歯科医師が公衆または特定多数人のために医療または歯科医療を行う場所であり、何人以上の患者を入院させるための施設を有するものを指しますか。', options: ['10人', '20人', '50人', '100人'], correct: 1, explanation: '医療法において、「病院」は、20人以上の患者を入院させるための施設を有するものと定義されています。'},
+            {id: 'Q99', text: '救急隊員が、暴行や傷害を受けた場合（公務執行妨害等に該当する場合）、隊員は誰に対して損害賠償請求の措置を求めることができますか。', options: ['消防本部', '市町村長', '警察署', '救急隊長'], correct: 2, explanation: '妨害行為は、刑法上の公務執行妨害や傷害、器物損壊などに該当する場合があり、救急隊員は警察署に相談を求め、損害賠償などの措置を求めることができます。'},
+            {id: 'Q100', text: '救急業務の原則として、救急隊員が現場でバイスタンダー（居合わせた人）に協力を求めた場合、バイスタンダーが負った損害について補償を行う法律上の根拠はどれですか。', options: ['医療法', '刑法', '消防法', '救急救命士法'], correct: 2, explanation: '救急隊が現場に居合わせた人などに協力を求めた場合、消防法第36条の3の規定に基づき、「救急業務への協力者」として損害補償の対象となることがあります。'}
+        ];
+
+        // ----------------------------------------------------
+        // 2. クイズの状態管理
+        // ----------------------------------------------------
+        let currentQuizQuestions = [];
+        let userAnswers = [];
+        const NUM_QUESTIONS = 5;
+
+        // ----------------------------------------------------
+        // 3. ロジック関数
+        // ----------------------------------------------------
+
+        /**
+         * 100問のリストから、ランダムに5問を抽出する
+         */
+        function getRandomQuestions() {
+            const shuffled = [...allQuestions].sort(() => 0.5 - Math.random());
+            currentQuizQuestions = shuffled.slice(0, NUM_QUESTIONS);
+            userAnswers = Array(NUM_QUESTIONS).fill(null);
+        }
+
+        /**
+         * クイズをHTMLにレンダリングする
+         */
+        function renderQuiz() {
+            const listContainer = document.getElementById('questions-list');
+            const submitButton = document.getElementById('submit-button');
+            const resultsArea = document.getElementById('results-area');
+            const statusMessage = document.getElementById('status-message');
+
+            listContainer.innerHTML = '';
+            resultsArea.classList.add('hidden');
+            submitButton.classList.add('opacity-50', 'cursor-not-allowed');
+            submitButton.disabled = true;
+            statusMessage.textContent = `全${NUM_QUESTIONS}問中 0問回答済み`;
+
+            currentQuizQuestions.forEach((q, qIndex) => {
+                const qDiv = document.createElement('div');
+                qDiv.className = 'mb-10 p-5 border-b border-gray-600 last:border-b-0 rounded-xl bg-gray-700 shadow-xl';
+                qDiv.innerHTML = `
+                    <h3 class="text-xl sm:text-2xl font-semibold mb-5 text-yellow-400">
+                        問${qIndex + 1}. (${q.id}) ${q.text}
+                    </h3>
+                    <div id="options-${qIndex}" class="space-y-3">
+                        ${q.options.map((option, oIndex) => `
+                            <button
+                                data-q-index="${qIndex}"
+                                data-o-index="${oIndex}"
+                                onclick="selectAnswer(${qIndex}, ${oIndex})"
+                                class="option-button w-full text-left p-4 rounded-xl text-lg hover:ring-2 hover:ring-yellow-400 focus:outline-none focus:ring-2 focus:ring-yellow-400"
+                            >
+                                <span class="font-bold mr-3">${oIndex + 1}.</span> ${option}
+                            </button>
+                        `).join('')}
+                    </div>
+                    <div id="explanation-${qIndex}" class="mt-4 text-sm p-4 hidden"></div>
+                `;
+                listContainer.appendChild(qDiv);
+            });
+        }
+
+        /**
+         * 選択肢がクリックされた時の処理
+         * @param {number} qIndex - 問題のインデックス (0-4)
+         * @param {number} oIndex - 選択肢のインデックス (0-3)
+         */
+        function selectAnswer(qIndex, oIndex) {
+            userAnswers[qIndex] = oIndex;
+
+            // ボタンのスタイルをリセット
+            const optionsDiv = document.getElementById(`options-${qIndex}`);
+            Array.from(optionsDiv.children).forEach(button => {
+                button.classList.remove('bg-yellow-400', 'text-gray-900', 'border-yellow-400', 'ring-2');
+                button.classList.add('text-gray-300', 'bg-gray-700', 'border-gray-600');
+            });
+
+            // 選択されたボタンにスタイルを適用
+            const selectedButton = optionsDiv.querySelector(`[data-o-index="${oIndex}"]`);
+            if (selectedButton) {
+                selectedButton.classList.add('bg-yellow-400', 'text-gray-900', 'ring-2', 'ring-yellow-400');
+                selectedButton.classList.remove('text-gray-300', 'bg-gray-700');
+            }
+
+            updateSubmitButtonState();
+        }
+
+        /**
+         * 採点ボタンの状態を更新する
+         */
+        function updateSubmitButtonState() {
+            const answeredCount = userAnswers.filter(a => a !== null).length;
+            const submitButton = document.getElementById('submit-button');
+            const statusMessage = document.getElementById('status-message');
+
+            statusMessage.textContent = `全${NUM_QUESTIONS}問中 ${answeredCount}問回答済み`;
+
+            if (answeredCount === NUM_QUESTIONS) {
+                submitButton.disabled = false;
+                submitButton.classList.remove('opacity-50', 'cursor-not-allowed');
+            } else {
+                submitButton.disabled = true;
+                submitButton.classList.add('opacity-50', 'cursor-not-allowed');
+            }
+        }
+
+        /**
+         * 採点処理と結果表示
+         */
+        function gradeQuiz() {
+            const resultsArea = document.getElementById('results-area');
+            const submitButton = document.getElementById('submit-button');
+            const statusMessage = document.getElementById('status-message');
+            let score = 0;
+
+            // 採点ボタンを無効化
+            submitButton.disabled = true;
+            submitButton.classList.add('opacity-50', 'cursor-not-allowed');
+
+            currentQuizQuestions.forEach((q, qIndex) => {
+                const optionsDiv = document.getElementById(`options-${qIndex}`);
+                const explanationDiv = document.getElementById(`explanation-${qIndex}`);
+                const userAnswer = userAnswers[qIndex];
+                const isCorrect = userAnswer === q.correct;
+
+                if (isCorrect) {
+                    score++;
+                }
+
+                // 全てのボタンを無効化し、色付け
+                Array.from(optionsDiv.children).forEach((button, oIndex) => {
+                    button.disabled = true;
+                    button.classList.remove('hover:bg-gray-400', 'hover:ring-yellow-400', 'ring-2', 'bg-yellow-400');
+                    button.classList.add('cursor-not-allowed');
+
+                    if (oIndex === q.correct) {
+                        // 正解の選択肢
+                        button.classList.add('bg-green-600', 'text-white', 'font-bold');
+                    } else if (oIndex === userAnswer) {
+                        // ユーザーが選んだ不正解の選択肢
+                        button.classList.add('bg-red-600', 'text-white');
+                    } else {
+                        // その他の選択肢
+                        button.classList.add('bg-gray-600', 'text-gray-300');
+                    }
+                });
+
+                // 解説を表示
+                explanationDiv.innerHTML = `
+                    <div class="${isCorrect ? 'result-correct' : 'result-incorrect'} rounded-lg p-3 mt-4">
+                        <p class="font-bold text-lg mb-1">${isCorrect ? '正解!' : '不正解...'}</p>
+                        <p class="text-white"><strong>正解: ${q.correct + 1}.</strong> ${q.options[q.correct]}</p>
+                        <p class="mt-2 text-sm">${q.explanation}</p>
+                    </div>
+                `;
+                explanationDiv.classList.remove('hidden');
+            });
+
+            // 最終結果の表示
+            resultsArea.innerHTML = `
+                <h2 class="text-3xl font-bold text-yellow-400 border-b-2 border-yellow-400 pb-2 mb-6">採点結果と解説</h2>
+                <div class="bg-gray-800 p-6 rounded-xl text-center shadow-2xl">
+                    <p class="text-2xl sm:text-3xl font-extrabold mb-4">あなたのスコア: <span class="text-4xl sm:text-5xl text-green-400">${score}</span> / ${NUM_QUESTIONS} 問正解</p>
+                    <p class="text-lg text-gray-300">復習が必要な分野を確認しましょう。</p>
+                </div>
+            `;
+            resultsArea.classList.remove('hidden');
+
+            statusMessage.textContent = `採点完了！スコア: ${score} / ${NUM_QUESTIONS}`;
+
+            // 結果エリアまでスクロール
+            resultsArea.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        }
+
+        /**
+         * 初期化処理 (再挑戦ボタンで呼ばれる)
+         */
+        function initQuiz() {
+            getRandomQuestions();
+            renderQuiz();
+        }
+
+        // ページロード時にクイズを初期化
+        document.addEventListener('DOMContentLoaded', initQuiz);
+    </script>
+</body>
+</html>
+
